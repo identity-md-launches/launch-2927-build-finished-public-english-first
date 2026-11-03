@@ -1,0 +1,6 @@
+node_modules/
+**/node_modules/
+.npm/
+.vite/
+*.tgz
+test/scratch/
