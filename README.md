@@ -69,7 +69,54 @@ are.
 - Cheer history fails to refresh → Recent cheers says "Cheers could not refresh; showing last
   read." Wheel and block alerts keep working: each data source sets its own alert baseline.
 
-## Validation (this revision)
+## Validation (SPINNING layout revision)
+
+Checked on 2026-11-03 with Node 22.23.3. The reported overflow reproduced in Chromium and
+WebKit against the committed export with fresh SPINNING / 123.4 RPM telemetry. At 320/390px, the control page's scroll widths
+were 361/431px and the standalone card's were 340/410px. The cause was the non-wrapping
+`.ov-top` row (`src/styles.css:481`). Adding `flex-wrap: wrap` lets RPM move below the badge
+and the existing meter rows follow it, keeping the same readable type sizes.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Production build | `npm run build` | passed; includes `tsc --noEmit`; rebuilt `dist/` |
+| Typecheck | `npm run typecheck` | passed |
+| Unit tests | `npm test` | 7/7 passed |
+| Existing interaction suite | `IMD_PLAYWRIGHT=<Playwright module> node tests/interaction.mjs` | 13/13 passed in Chromium, including clipboard, alert settings, modal keyboard behavior, network switching, arming, mock cheer payload and strip overlay |
+| SPINNING regression | `node test/scratch/check-spinning.mjs after chromium` and `node test/scratch/check-spinning.mjs after-webkit webkit` | 16/16 passed across Chromium and WebKit: control and card overlay at 320, 390, 480 and 1440px, served under `/preview/` |
+| Pinned design probe | `node .imd/reads/skills/design-critic/scripts/taste.mjs --out test/scratch/taste` | all 16 checks passed at 320, 390 and 1440px |
+
+Build, typecheck and unit tests ran in an isolated copy with the identical source and lockfile;
+dependencies and browser runtimes stayed outside the repository. Browser checks ran against the
+delivered `dist/`. The focused regression mocks only `https://api.squeekchain.com/v1/status`
+with the reviewer's fresh measurement; both Sepolia RPC hosts remain unmodified. It checks
+document width, card/value bounds, font sizes, meter flow and overlay transparency. Both routes
+now have scroll widths exactly 320/390px. At 480/1440px the card, badge, RPM and meter geometry
+matches the previous export. The 390px product preview and Copy OBS URL action remain on the
+first screen. No uncaught page errors or failed local asset responses were observed.
+
+The pinned Better Interface guide was applied to the affected shared card and reviewed across
+all six domains:
+
+| Domain | Coverage and result |
+| --- | --- |
+| Accessibility | Reflow keeps all live values visible at 320/390px; existing keyboard and focus-containment interaction checks pass. |
+| Layout | Fixed the reproduced high-severity `.ov-top` overflow at `src/styles.css:481`; checked both routes and wide-layout geometry. |
+| Writing | Reviewed the existing labels and values in `src/Overlay.tsx`; this correction needs no copy changes. |
+| Typography | RPM remains 36px at 320px and 48px at 390px; no clipping or shrinking was introduced. The probe's type-scale and tracking checks pass. |
+| Colors | Existing tokens are retained. The probe's contrast check passes for its default rendered state; contrast over arbitrary OBS scenes was not measured. |
+| UI | Inspected the rendered SPINNING card at mobile and desktop sizes; the existing interaction suite passes and the standalone overlay remains transparent. |
+
+Before/after screenshots and measurements were captured in `test/scratch/spinning/`; probe
+screenshots are in `test/scratch/taste/shots/`. These scratch files are removed before submission.
+The supplied browser tool could not launch its missing Chrome installation, so the checks used
+a separate Playwright installation. WebKit used temporary Linux libraries and software rendering;
+`PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1` bypassed its system-install check because those
+libraries were extracted under `/tmp`. No real wallet, transaction, physical mobile device, OBS,
+screen reader or native browser zoom was exercised. The build emitted the existing dependency
+warning about externalizing `node:worker_threads`. Complete for the stated revision scope.
+
+## Validation (previous revision)
 
 Run on 2026-11-03 on the contributor machine, against the production export in `dist/`.
 

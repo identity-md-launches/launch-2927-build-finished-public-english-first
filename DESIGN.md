@@ -90,8 +90,12 @@ colors on the translucent overlay were not measured separately.
   - 380px and below: smaller hero and overlay numerals.
 - Overlay route: `.obs-stage` adds `--s3` padding. The card is capped at 480px. The strip is a
   5-column grid (`:667`) for a 1280 × 96 source.
+- The card's `.ov-top` (`src/styles.css:481`) is a wrapping flex row. When SPINNING and the
+  RPM group cannot fit side by side, RPM moves below the badge and the meter rows flow down.
+  Numerals keep the existing type sizes; values are not clipped or scaled down to fit.
 - Widths checked in a browser: 320, 390 and 1440 (design probe), plus 320/390 in the
-  wrong-network state and 1280 × 96 for the strip.
+  wrong-network state and 1280 × 96 for the strip. SPINNING with 123.4 RPM was also checked on
+  the control preview and standalone card at 320, 390, 480 and 1440px in Chromium and WebKit.
 
 ## Elevation & Depth
 
