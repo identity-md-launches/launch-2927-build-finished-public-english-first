@@ -98,24 +98,28 @@ export function wheelState(input: { coreStatus?: string; freshness?: string; obs
 
 export type AlertEvent = { id: string; kind: AlertKind; title: string; detail: string }
 
-export type Snapshot = { wheel: WheelState; blockHeight?: bigint; cheers: { hash: string; from: string }[] }
+/**
+ * What the overlay has read so far. A field is undefined until its own source first answers, so each
+ * source sets its own baseline: a failing cheer-history read never holds back wheel or block alerts.
+ */
+export type Snapshot = { wheel?: WheelState; blockHeight?: bigint; cheers?: { hash: string; from: string }[] }
 
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`
 
 /**
  * Compare two consecutive snapshots and return the alerts the overlay should show, filtered by what
- * the streamer armed. The first snapshot never fires: an overlay that just loaded must not replay
+ * the streamer armed. A source's first value never fires: an overlay that just loaded must not replay
  * history as if it were happening now.
  */
 export function diffAlerts(prev: Snapshot | null, next: Snapshot, armed: readonly AlertKind[]): AlertEvent[] {
   if (!prev) return []
   const out: AlertEvent[] = []
-  if (prev.wheel !== 'SPINNING' && next.wheel === 'SPINNING') out.push({ id: `spin-${Date.now()}`, kind: 'spin', title: 'SPINNING', detail: 'The hamster is on the wheel' })
+  if (prev.wheel !== undefined && prev.wheel !== 'SPINNING' && next.wheel === 'SPINNING') out.push({ id: `spin-${Date.now()}`, kind: 'spin', title: 'SPINNING', detail: 'The hamster is on the wheel' })
   if (prev.wheel === 'SPINNING' && next.wheel === 'IDLE') out.push({ id: `idle-${Date.now()}`, kind: 'idle', title: 'IDLE', detail: 'The wheel has stopped' })
   if (prev.blockHeight !== undefined && next.blockHeight !== undefined && next.blockHeight > prev.blockHeight) {
     out.push({ id: `block-${next.blockHeight}`, kind: 'block', title: `Block ${next.blockHeight.toLocaleString('en-US')}`, detail: 'A Squeek block is complete' })
   }
-  const seen = new Set(prev.cheers.map((c) => c.hash))
-  for (const c of next.cheers) if (!seen.has(c.hash)) out.push({ id: `cheer-${c.hash}`, kind: 'cheer', title: 'Cheer', detail: `${short(c.from)} cheered the hamster` })
+  const seen = new Set(prev.cheers?.map((c) => c.hash))
+  if (prev.cheers && next.cheers) for (const c of next.cheers) if (!seen.has(c.hash)) out.push({ id: `cheer-${c.hash}`, kind: 'cheer', title: 'Cheer', detail: `${short(c.from)} cheered the hamster` })
   return out.filter((e) => armed.includes(e.kind))
 }

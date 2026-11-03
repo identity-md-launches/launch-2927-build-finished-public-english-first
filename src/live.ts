@@ -14,7 +14,10 @@ export function useNow(intervalMs = 1000) {
 
 export type CoreConfig = { roundZeroStart: number; roundSeconds: number; unitsPerBlock: bigint }
 
-/** SqueekCore's configuration changes only on a redeploy; read it once per session. */
+/**
+ * SqueekCore's configuration changes only on a redeploy: once read it is kept for the session. Until
+ * a read succeeds it is retried every 12 seconds, so an unattended OBS source recovers by itself.
+ */
 export function useCoreConfig() {
   return useQuery({
     queryKey: ['core-config'],
@@ -26,6 +29,7 @@ export function useCoreConfig() {
       return { roundZeroStart, roundSeconds, unitsPerBlock: c[10] }
     },
     staleTime: Infinity,
+    refetchInterval: (query) => (query.state.data ? false : 12_000),
     retry: 3,
   })
 }

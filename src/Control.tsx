@@ -152,7 +152,7 @@ export function Control() {
         <div className="grid">
           <section className="panel" aria-labelledby="arm-title">
             <h2 id="arm-title">Arm alerts</h2>
-            <p className="muted">Arming saves these picks to your wallet.</p>
+            <p className="muted">Arming saves these picks in this browser for this wallet.</p>
             <fieldset className="checks">
               <legend className="sr-only">Alerts</legend>
               {ALERT_KINDS.map((k) => (
@@ -232,6 +232,9 @@ export function Control() {
               {cheer.s === 'failed' && <span className="err">{cheer.msg} {cheer.hash && <a className="link" href={`${EXPLORER}/tx/${cheer.hash}`} target="_blank" rel="noopener">View transaction</a>}</span>}
             </p>
             <h3>Recent cheers</h3>
+            {cheers.isError && cheers.data && (
+              <p className="err" role="status">Cheers could not refresh; showing last read. Retrying every 12 seconds.</p>
+            )}
             {cheers.isPending ? (
               <p className="muted">Reading Sepolia…</p>
             ) : cheers.isError && !cheers.data ? (

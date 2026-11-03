@@ -182,7 +182,15 @@ code,
 
 .wallet-ctl {
   display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--s2);
+}
+
+/* When the header wraps, the wallet buttons share (or each take) the full row; heights stay 44px. */
+.wallet-ctl .btn {
+  flex: 0 1 auto;
 }
 
 .link {
@@ -207,10 +215,12 @@ code,
 
 .top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--s3);
+  gap: var(--s2) var(--s3);
   min-height: 64px;
+  padding: var(--s2) 0;
 }
 
 .brand {
@@ -594,6 +604,17 @@ code,
   font-size: var(--fs-xs);
   border-top: 1px solid var(--line);
   padding-top: var(--s3);
+}
+
+.ov-warn {
+  color: var(--offline);
+}
+
+/* Strip layout: a read problem takes the alert slot while no alert is showing. */
+.ov-note {
+  color: var(--offline);
+  font-size: var(--fs-xs);
+  line-height: 1.3;
 }
 
 .ov-alert {

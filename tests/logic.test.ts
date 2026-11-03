@@ -52,3 +52,18 @@ test('alerts fire on changes only, and only when armed', () => {
   // OFFLINE after SPINNING is not an IDLE alert.
   assert.deepEqual(diffAlerts(next, { ...next, wheel: 'OFFLINE' }, ['idle']), [])
 })
+
+test('each source sets its own baseline: missing cheers never hold back wheel or block alerts', () => {
+  const loading = { wheel: undefined, blockHeight: undefined, cheers: undefined }
+  assert.deepEqual(diffAlerts(null, loading, ['spin']), [])
+  // Telemetry's first answer is a baseline, not a SPINNING event.
+  assert.deepEqual(diffAlerts(loading, { wheel: 'SPINNING' as const }, ['spin']), [])
+  // Cheer history unavailable (undefined) while the wheel starts and a block completes.
+  const a = { wheel: 'IDLE' as const, blockHeight: 10n, cheers: undefined }
+  const b = { wheel: 'SPINNING' as const, blockHeight: 11n, cheers: undefined }
+  assert.deepEqual(diffAlerts(a, b, ['spin', 'idle', 'block', 'cheer']).map((e) => e.kind), ['spin', 'block'])
+  // Cheer history arriving late is a baseline: nothing is replayed.
+  const c = { ...b, cheers: [{ hash: '0xaa', from: A }] }
+  assert.deepEqual(diffAlerts(b, c, ['cheer']), [])
+  assert.deepEqual(diffAlerts(c, { ...c, cheers: [{ hash: '0xbb', from: A }, ...c.cheers] }, ['cheer']).length, 1)
+})

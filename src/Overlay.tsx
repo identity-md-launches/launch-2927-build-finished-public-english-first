@@ -29,20 +29,21 @@ export function StreamOverlay({ settings, testAlert }: { settings: OverlaySettin
   const cfg = useCoreConfig()
   const core = useCoreState()
   const cheers = useCheers()
-  const { telemetry } = useTelemetry(now)
+  const { telemetry, query: tq } = useTelemetry(now)
+  const wheelKnown = tq.data !== undefined
 
   const [queue, setQueue] = useState<AlertEvent[]>([])
   const [current, setCurrent] = useState<AlertEvent | null>(null)
   const prev = useRef<Snapshot | null>(null)
 
-  // Fire alerts on changes only; the first snapshot after loading is the baseline.
+  // Fire alerts on changes only. Each source's first value is its own baseline, so wheel and block
+  // alerts work while cheer history is unavailable, and late cheer history is not replayed.
   useEffect(() => {
-    if (core.data === undefined || cheers.data === undefined) return
-    const next: Snapshot = { wheel: telemetry.wheel, blockHeight: core.data.blockHeight, cheers: cheers.data }
+    const next: Snapshot = { wheel: wheelKnown ? telemetry.wheel : undefined, blockHeight: core.data?.blockHeight, cheers: cheers.data }
     const events = diffAlerts(prev.current, next, settings.alerts)
     prev.current = next
     if (events.length) setQueue((q) => [...q, ...events])
-  }, [telemetry.wheel, core.data, cheers.data, settings.alerts])
+  }, [wheelKnown, telemetry.wheel, core.data, cheers.data, settings.alerts])
 
   useEffect(() => {
     if (testAlert) setQueue((q) => [...q, testAlert])
@@ -65,6 +66,16 @@ export function StreamOverlay({ settings, testAlert }: { settings: OverlaySettin
   const fraction = core.data && cfg.data ? blockFraction(core.data.blockProgress, cfg.data.unitsPerBlock) : null
   const nextBlock = core.data ? (core.data.blockHeight + 1n).toLocaleString('en-US') : null
   const chainDown = core.isError && !core.data
+  const readAt = core.data ? new Date(core.data.readAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : null
+  // Problems the viewer must see, chain staleness first (the OFFLINE badge already speaks for the
+  // wheel); null when every read is current.
+  const problem = core.isError && core.data
+    ? `Sepolia update failed; showing last read ${readAt}`
+    : cfg.isError && !cfg.data
+      ? 'Sepolia configuration unavailable; retrying'
+      : telemetry.wheel === 'OFFLINE'
+        ? 'Wheel telemetry unavailable, retrying'
+        : null
 
   const banner = (
     <div className={`ov-alert ${current ? `ov-alert-${current.kind}` : 'ov-alert-empty'}`} role="status" aria-live="polite">
@@ -121,7 +132,7 @@ export function StreamOverlay({ settings, testAlert }: { settings: OverlaySettin
         {rpm}
         {block}
         {round}
-        <div className="ov-slot">{banner}</div>
+        <div className="ov-slot">{current || !problem ? banner : <div className="ov-note">{problem}</div>}</div>
       </div>
     )
   }
@@ -138,7 +149,7 @@ export function StreamOverlay({ settings, testAlert }: { settings: OverlaySettin
       <div className="ov-slot">
         {current ? banner : (
           <div className="ov-foot">
-            <span>{telemetry.wheel === 'OFFLINE' ? 'Wheel telemetry unavailable, retrying' : 'Squeekchain · Sepolia'}</span>
+            <span className={problem ? 'ov-warn' : undefined}>{problem ?? 'Squeekchain · Sepolia'}</span>
             {settings.streamer && <span>Streamer {short(settings.streamer)}</span>}
           </div>
         )}

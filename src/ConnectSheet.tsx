@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain, type Connector } from 'wagmi'
 import { chain } from './config'
 import { short } from './logic'
@@ -23,13 +24,32 @@ export function ConnectSheet() {
   const [note, setNote] = useState<string | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const openerRef = useRef<HTMLButtonElement>(null)
+  const sheetRef = useRef<HTMLDivElement>(null)
 
+  // The sheet is portalled outside #root, so the page behind it can be made inert while it is open;
+  // Tab and Shift+Tab cycle inside the sheet, Escape closes it, and focus returns to the opener.
   useEffect(() => {
     if (!open) return
+    const root = document.getElementById('root')
+    if (root) root.inert = true
     closeRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return setOpen(false)
+      if (e.key !== 'Tab' || !sheetRef.current) return
+      const items = [...sheetRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')]
+      if (items.length === 0) return
+      const first = items[0]!
+      const last = items[items.length - 1]!
+      const inside = sheetRef.current.contains(document.activeElement)
+      if (e.shiftKey && (!inside || document.activeElement === first)) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && (!inside || document.activeElement === last)) { e.preventDefault(); first.focus() }
+    }
     addEventListener('keydown', onKey)
-    return () => { removeEventListener('keydown', onKey); openerRef.current?.focus() }
+    return () => {
+      removeEventListener('keydown', onKey)
+      if (root) root.inert = false
+      openerRef.current?.focus()
+    }
   }, [open])
   useEffect(() => { if (isConnected) setOpen(false) }, [isConnected])
 
@@ -64,9 +84,9 @@ export function ConnectSheet() {
   return (
     <>
       <button ref={openerRef} className="btn btn-primary" onClick={() => { setNote(null); setOpen(true) }}>Connect</button>
-      {open && (
+      {open && createPortal(
         <div className="sheet-bg" onClick={() => setOpen(false)}>
-          <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(e) => e.stopPropagation()}>
+          <div ref={sheetRef} className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
               <h2 id="sheet-title">Connect a wallet</h2>
               <button ref={closeRef} className="x" aria-label="Close" onClick={() => setOpen(false)}>×</button>
@@ -93,7 +113,8 @@ export function ConnectSheet() {
             ))}
             {note && <p className="sheet-note" role="alert">{note}</p>}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

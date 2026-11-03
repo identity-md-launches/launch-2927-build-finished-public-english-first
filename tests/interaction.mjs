@@ -41,6 +41,7 @@ const mockWallet = `(() => {
       throw Object.assign(new Error('unsupported ' + method), { code: 4200 })
     },
   }
+  window.__setChain = (c) => { chainId = c; (listeners.chainChanged || []).forEach((f) => f(c)) }
   const info = { uuid: '00000000-0000-4000-8000-000000000001', name: 'Mock Wallet', icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22/>', rdns: 'test.mock' }
   const announce = () => window.dispatchEvent(new CustomEvent('eip6963:announceProvider', { detail: Object.freeze({ info, provider }) }))
   window.addEventListener('eip6963:requestProvider', announce)
@@ -114,11 +115,34 @@ try {
     await dialog.waitFor({ state: 'detached' })
   })
 
-  await check('wrong chain offers Switch to Sepolia, then shows the address', async () => {
+  await check('connect sheet keeps Tab and Shift+Tab inside, page behind is inert', async () => {
+    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Connect a wallet' })
+    await dialog.getByRole('button', { name: 'Mock Wallet' }).waitFor()
+    const inside = () => page.evaluate(() => Boolean(document.activeElement?.closest('[role=dialog]')))
+    for (let i = 0; i < 6; i++) { await page.keyboard.press('Tab'); assert.ok(await inside(), `Tab ${i + 1} left the dialog`) }
+    for (let i = 0; i < 6; i++) { await page.keyboard.press('Shift+Tab'); assert.ok(await inside(), `Shift+Tab ${i + 1} left the dialog`) }
+    assert.equal(await page.evaluate(() => document.getElementById('root').inert), true)
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'detached' })
+    assert.equal(await page.evaluate(() => document.getElementById('root').inert), false)
+    assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Connect')
+  })
+
+  await check('wrong chain offers Switch to Sepolia without overflow at 320, then shows the address', async () => {
     await page.getByRole('button', { name: 'Connect', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Mock Wallet' }).click()
-    const sw = page.getByRole('button', { name: 'Switch to Sepolia' }).first()
+    // wagmi connects straight to Sepolia; then the wallet moves to Ethereum on its own.
+    await page.getByRole('button', { name: /0x1111…1111 · Disconnect/ }).waitFor()
+    await page.evaluate(() => window.__setChain('0x1'))
+    const sw = page.getByRole('button', { name: 'Switch to Sepolia', exact: true })
     await sw.waitFor()
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 })
+      const m = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, right: Math.max(...[...document.querySelectorAll('.wallet-ctl .btn')].map((b) => b.getBoundingClientRect().right)) }))
+      assert.ok(m.sw <= width && m.right <= width, `overflow at ${width}: ${JSON.stringify(m)}`)
+    }
+    await page.setViewportSize({ width: 390, height: 844 })
     await sw.click()
     await page.getByRole('button', { name: /0x1111…1111 · Disconnect/ }).waitFor()
   })
